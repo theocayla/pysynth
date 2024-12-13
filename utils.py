@@ -128,3 +128,12 @@ def getNoteFromFrequency(self, frequency):
     for note in NOTE_FREQUENCIES:
         if NOTE_FREQUENCIES[note] == frequency:
             return note
+
+def notes2freqs(chord):
+    '''
+    Takes a list of notes and outputs a list of correpsonding frequencies
+    '''
+    freqs = []
+    for note in chord:
+        freqs.append(NOTE_FREQUENCIES.get(note))
+    return filter(None, freqs)

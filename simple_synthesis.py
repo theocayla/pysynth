@@ -155,11 +155,11 @@ if __name__ == "__main__":
         )
 
     # # Plot the envelope
-    # plt.plot(t, envelope)
-    # plt.title("Amplitude Envelope")
-    # plt.xlabel("Time (seconds)")
-    # plt.ylabel("Amplitude")
-    # plt.show()
+    plt.plot(t, envelope)
+    plt.title("Amplitude Envelope")
+    plt.xlabel("Time (seconds)")
+    plt.ylabel("Amplitude")
+    plt.show()
 
     # Play tone with the generated envelope
     # play_tone_with_envelope(frequency, duration, envelope)
