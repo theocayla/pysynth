@@ -1,9 +1,7 @@
 import numpy as np
 import sounddevice as sd
 import threading
-
-import keyboard  # Import for keyboard listening
-
+from simple_synthesis import generate_tone, generate_envelope
 from utils import NOTE_FREQUENCIES, SAMPLE_RATE
 
 # Global constants
@@ -11,19 +9,19 @@ CHUNK_DURATION = 0.05  # Duration of each chunk in seconds
 AMPLITUDE = 0.5  # Amplitude of the sine waves
 
 # Mapping of keys to frequencies (in Hz)
-# key_to_frequency = {
-#     'q': NOTE_FREQUENCIES["C4"],
-#     's': NOTE_FREQUENCIES["D4"],
-#     'd': NOTE_FREQUENCIES["E4"],
-#     'f': NOTE_FREQUENCIES["F4"],
-# }
-
 key_to_frequency = {
-    16: NOTE_FREQUENCIES["C4"],  # 'q' -> 16
-    31: NOTE_FREQUENCIES["D4"],  # 's' -> 31
-    32: NOTE_FREQUENCIES["E4"],  # 'd' -> 32
-    33: NOTE_FREQUENCIES["F4"],  # 'f' -> 33
+    'q': NOTE_FREQUENCIES["C4"],
+    's': NOTE_FREQUENCIES["D4"],
+    'd': NOTE_FREQUENCIES["E4"],
+    'f': NOTE_FREQUENCIES["F4"],
 }
+
+# key_to_frequency = {
+#     16: NOTE_FREQUENCIES["C4"],  # 'q' -> 16
+#     31: NOTE_FREQUENCIES["D4"],  # 's' -> 31
+#     32: NOTE_FREQUENCIES["E4"],  # 'd' -> 32
+#     33: NOTE_FREQUENCIES["F4"],  # 'f' -> 33
+# }
 
 # Shared state
 # We need to track the signal phase to make sure we sync each note and don't hear a click when switching
@@ -56,7 +54,7 @@ def audio_callback(outdata, frames, time, status):
         phase = current_phase
 
     duration = frames / SAMPLE_RATE
-    wave, phase = generate_sine_wave(frequency, duration, SAMPLE_RATE, phase)
+    wave, phase = generate_tone(frequency, duration, envelope=None, sample_rate=SAMPLE_RATE, initial_phase=phase, waveform="sawtooth")
 
     with lock:
         current_phase = phase  # Update global phase to keep track of where we are
@@ -91,51 +89,25 @@ def stop_note():
     with lock:
         current_frequency = 0
 
-def on_press(key):
-    """Handle key press events."""
-    try:
-        if key.char in key_to_frequency:  # Check if the key is mapped to a frequency
-            play_note(key.char)
-    except AttributeError:
-        pass  # Ignore non-character keys
-
-
-def on_release(key):
-    """Handle key release events."""
-    try:
-        if key.char in key_to_frequency:  # Check if the key is mapped to a frequency
-            stop_note()
-    except AttributeError:
-        pass  # Ignore non-character keys
-
 
 def main():
-    """Main function to handle user input."""
     print("Press keys to play notes. Press ESC to quit.")
-
     start_audio_stream()  # Start audio playback
 
-    # while True:
-    #     try:
-    #         note = input("Enter note key (q/s/d/f): ").strip()
-    #         if note == "ESC":
-    #             stop_event.set()
-    #             break
-    #         elif note in key_to_frequency:
-    #             play_note(note)
-    #         else:
-    #             print("Invalid key.")
-    #     except KeyboardInterrupt:
-    #         stop_event.set()
-    #         break
-    # Start listening for key presses
-
-    # Key listeners
+    # TODO : find a way to use the keyboard lib or pynput, now we need to press enter for eahc note
     while True:
-        for key_code, frequency in key_to_frequency.items():
-            if keyboard.is_pressed(key_code):
-                play_note(frequency)  # Remplacez par votre logique
-
+        try:
+            note = input("Enter note key (q/s/d/f): ").strip()
+            if note == "ESC":
+                stop_event.set()
+                break
+            elif note in key_to_frequency:
+                play_note(note)
+            else:
+                print("Invalid key.")
+        except KeyboardInterrupt:
+            stop_event.set()
+            break
 
 if __name__ == "__main__":
     main()

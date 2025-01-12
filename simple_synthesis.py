@@ -35,11 +35,11 @@ def generate_envelope(duration, attack_time=0.1, decay_time=0.1, sustain_level=0
     t = np.linspace(0, duration, total_samples, endpoint=False)
 
     # Attack phase
-    attack_samples = int(attack_time * SAMPLE_RATE)
+    attack_samples = int(attack_time * SAMPLE_RATE * duration)
     attack_env = np.linspace(0, 1, attack_samples)
 
     # Decay phase
-    decay_samples = int(decay_time * SAMPLE_RATE)
+    decay_samples = int(decay_time * SAMPLE_RATE* duration)
     decay_env = np.linspace(1, sustain_level, decay_samples)
 
     # Sustain phase
@@ -60,10 +60,27 @@ def generate_tone_with_envelope(frequency, duration, envelope, SAMPLE_RATE=44100
     signal = envelope * np.sin(2 * np.pi * frequency * t)
     return signal
 
-def generate_tone_with_envelope_continuous_phase(frequency, duration, envelope, sample_rate, initial_phase=0):
+def generate_tone(frequency, duration, envelope=None, sample_rate=SAMPLE_RATE, initial_phase=0, waveform="sinus"):
+    '''
+    Generates tone, applies envelope if it exists, and tracks phase for sound continuity puropses.
+    Three waveforms are available : sinus, sawtooth or square
+    '''
     t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
     omega = 2 * np.pi * frequency
-    signal = np.sin(omega * t + initial_phase) * envelope
+
+    # Define waveform 
+    if waveform == 'sinus':
+        signal = np.sin(omega * t + initial_phase)
+    elif waveform == 'sawtooth':
+        signal = 2 * (t * frequency - np.floor(0.5 + t * frequency))
+    elif waveform == 'square':
+        signal = np.sign(np.sin(omega * t + initial_phase))
+    else:
+        raise ValueError("Unsupported wave type. Choose among 'sinus', 'sawtooth', or 'square'.")
+
+    # Applies envelop
+    if envelope is not None:
+        signal *= envelope
     final_phase = (omega * duration + initial_phase) % (2 * np.pi)
     return signal, final_phase
 
@@ -107,23 +124,6 @@ def play_chorus_effect(frequencies, duration, depth=0.02, rate=1.5):
 
 # Set to keep track of currently pressed keys
 pressed_keys = set()
-
-# Function to handle key press events
-def on_key_press(event):
-    key = event.name
-    if key in key_to_tone:
-        pressed_keys.add(key)
-        tones = [key_to_tone[k] for k in pressed_keys]
-        play_chord_with_envelope(tones)
-
-# Function to handle key release events
-def on_key_release(event):
-    key = event.name
-    if key in pressed_keys:
-        pressed_keys.remove(key)
-        tones = [key_to_tone[k] for k in pressed_keys]
-        play_chord_with_envelope(tones)
-
 
 if __name__ == "__main__":
 
