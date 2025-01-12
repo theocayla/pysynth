@@ -2,8 +2,8 @@ import numpy as np
 import sounddevice as sd
 import threading
 
-from pynput import keyboard
-from utils import NOTE_FREQUENCIES, SAMPLE_RATE
+from simple_synthesis import generate_envelope, generate_tone_with_envelope_continuous_phase
+from utils import SAMPLE_RATE, NOTE_FREQUENCIES, notes2freqs
 
 # Global constants
 CHUNK_DURATION = 0.05  # Duration of each chunk in seconds
@@ -17,76 +17,64 @@ key_to_frequency = {
     'f': NOTE_FREQUENCIES["F4"],
 }
 
-# Set to track currently active keys
-active_keys = set()
-lock = threading.Lock()  # To safely access shared state
+# Multithreading
+note_thread = None
+stop_event = threading.Event()
 
-def generate_sine_wave(frequencies, duration, sample_rate, phase):
-    """Generate a combined sine wave for the given frequencies."""
-    t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
-    wave = np.zeros_like(t)
-    new_phases = []
-    for freq, ph in zip(frequencies, phase):
-        omega = 2 * np.pi * freq
-        wave += np.sin(omega * t + ph)
-        new_phases.append((omega * duration + ph) % (2 * np.pi))
-    return AMPLITUDE * wave / len(frequencies), new_phases
+global last_phase
+last_phase = 0
 
 
-def audio_callback(outdata, frames, time, status):
-    """Audio callback function to generate audio chunks in real-time."""
-    global current_phases
-    with lock:
-        frequencies = [key_to_frequency[key] for key in active_keys]
-    if frequencies:
-        wave, current_phases = generate_sine_wave(
-            frequencies, CHUNK_DURATION, SAMPLE_RATE, current_phases
+def note_runner(frequencies, duration, envelope):
+    '''
+    Executes play_chord_with_envelope with conditionnal stop
+    '''
+    global stop_event, last_phase
+    stop_event.clear()
+    t = np.linspace(0, duration, int(SAMPLE_RATE * duration), endpoint=False)
+    signal = t * 0
+    for frequency in frequencies:
+        tone, last_phase = generate_tone_with_envelope_continuous_phase(
+            frequency, duration, envelope, SAMPLE_RATE, initial_phase=last_phase
         )
-    else:
-        wave = np.zeros(frames)
-    outdata[:len(wave)] = wave.reshape(-1, 1)
-
-
-def start_audio_stream():
-    """Start the audio stream."""
-    global current_phases
-    current_phases = [0] * len(key_to_frequency)  # Initial phases for each frequency
-    stream = sd.OutputStream(
-        samplerate=SAMPLE_RATE,
-        channels=1,
-        callback=audio_callback,
-        # blocksize=int(CHUNK_DURATION * SAMPLE_RATE),
-        blocksize=int(1024),
-    )
-    stream.start()
-
-
-def on_press(key):
-    """Handle key press events."""
+        signal += tone
     try:
-        if key.char in key_to_frequency:
-            with lock:
-                active_keys.add(key.char)
-    except AttributeError:
-        pass
+        stream = sd.OutputStream(samplerate=SAMPLE_RATE, channels=1)
+        with stream:
+            for chunk in np.array_split(signal, 100):
+                if stop_event.is_set():
+                    break
+                stream.write(chunk.astype(np.float32))
+    except Exception as e:
+        print(f"Error playing chord: {e}")
 
 
-def on_release(key):
-    """Handle key release events."""
-    try:
-        if key.char in key_to_frequency:
-            with lock:
-                active_keys.discard(key.char)
-    except AttributeError:
-        pass
+def main():
+    global note_thread, stop_event
 
+    while True:
+        note = input("")
+        try:
+            frequency = [key_to_frequency[note]]
+            print(frequency)
+            duration = 10  # Durée en secondes
 
-# Main
+            _, envelope = generate_envelope(
+                duration=duration,
+                attack_time=0.5,
+                decay_time=0.1,
+                sustain_level=0.5,
+                release_time=0.1
+                )
+            if note_thread and note_thread.is_alive():
+                stop_event.set()
+                note_thread.join()
+
+            stop_event.clear()
+            note_thread = threading.Thread(target=note_runner, args=(frequency, duration, envelope))
+            note_thread.start()
+        except ValueError:
+            print("Invalid input.")
+
 if __name__ == "__main__":
-    print("Press keys to play notes. Press ESC to quit.")
-
-    start_audio_stream()  # Start audio playback thread
-
-    # Listen for keyboard input
-    with keyboard.Listener(on_press=on_press, on_release=on_release) as listener:
-        listener.join()
+    main()

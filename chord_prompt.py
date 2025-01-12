@@ -50,10 +50,10 @@ def main():
 
             _, envelope = generate_envelope(
                 duration=duration,
-                attack_time=0.3,
+                attack_time=0.5,
                 decay_time=0.1,
-                sustain_level=1,
-                release_time=1
+                sustain_level=0.5,
+                release_time=0.1
                 )
             if chord_thread and chord_thread.is_alive():
                 stop_event.set()

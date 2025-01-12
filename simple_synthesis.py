@@ -60,6 +60,13 @@ def generate_tone_with_envelope(frequency, duration, envelope, SAMPLE_RATE=44100
     signal = envelope * np.sin(2 * np.pi * frequency * t)
     return signal
 
+def generate_tone_with_envelope_continuous_phase(frequency, duration, envelope, sample_rate, initial_phase=0):
+    t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
+    omega = 2 * np.pi * frequency
+    signal = np.sin(omega * t + initial_phase) * envelope
+    final_phase = (omega * duration + initial_phase) % (2 * np.pi)
+    return signal, final_phase
+
 def play_tone_with_envelope(frequency, duration, envelope):
     signal = generate_tone_with_envelope(frequency, duration, envelope, SAMPLE_RATE)
     sd.play(signal, samplerate=SAMPLE_RATE)
