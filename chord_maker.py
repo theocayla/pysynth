@@ -1,4 +1,4 @@
-from simple_synthesis import play_chord_with_envelope, generate_envelope
+from synthesis import play_chord_with_envelope, generate_envelope
 from utils import notes2freqs
 
 NUM_OCTAVES = 5

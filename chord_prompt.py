@@ -4,7 +4,7 @@ import numpy as np
 import sounddevice as sd
 
 from chord_maker import buildChord
-from simple_synthesis import generate_envelope, generate_tone_with_envelope
+from synthesis import generate_envelope, generate_tone_with_envelope
 from utils import SAMPLE_RATE, notes2freqs
 
 # Multithreading
