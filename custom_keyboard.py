@@ -1,24 +1,27 @@
 import numpy as np
 import sounddevice as sd
 import threading
+import json
+from datetime import datetime 
+
+import matplotlib.pyplot as plt
+
 from synthesis import generate_tone, generate_envelope
-from utils import NOTE_FREQUENCIES, SAMPLE_RATE
+from utils import KEY2FREQ, SAMPLE_RATE
+
+# If True, we dump data into a csv file for further observation
+DEBUG = True
 
 # Global constants
 CHUNK_DURATION = 0.05  # Duration of each chunk in seconds
-AMPLITUDE = 0.5  # Amplitude of the sine waves
-DURATION = 0.8 # Total duration for a note
+AMPLITUDE = 0.3  # Amplitude of the sine waves
+DURATION = 0.5 # Total duration for a note
 # Envelope parameters
-ATTACK = 0.1 # in seconds
-DECAY = 0.5 # in seconds
+ATTACK = 0.05 # in seconds
+DECAY = 0.3 # in seconds
 
-# Mapping of the keyboard to frequencies (in Hz)
-key_to_frequency = {
-    'q': NOTE_FREQUENCIES["C4"],
-    's': NOTE_FREQUENCIES["D4"],
-    'd': NOTE_FREQUENCIES["E4"],
-    'f': NOTE_FREQUENCIES["F4"],
-}
+# Waveform can either be sinus, sawtooth or square
+WAVEFORM = "sinus"
 
 # Shared state
 # We need to track the signal phase to make sure we sync each note and don't hear a click when switching
@@ -32,9 +35,12 @@ current_envelope_position = 0  # Position in the envelope
 lock = threading.Lock()  # To safely update shared variables
 stop_event = threading.Event() # Event to stop playback
 
+# For debugging
+waveform_data = []  # Stores the waveform if DEBUG_MODE is active
+
 def audio_callback(outdata, frames, time, status):
     """Audio callback to generate and stream the sound in real-time."""
-    global current_phase, current_frequency, current_envelope, current_envelope_position
+    global current_phase, current_frequency, current_envelope, current_envelope_position, waveform_data
 
     if stop_event.is_set():
         outdata.fill(0)
@@ -53,7 +59,7 @@ def audio_callback(outdata, frames, time, status):
             duration,
             sample_rate=SAMPLE_RATE,
             initial_phase=phase,
-            waveform="sinus"
+            waveform=WAVEFORM
         )
 
         # Apply the corresponding portion of the envelope
@@ -69,6 +75,10 @@ def audio_callback(outdata, frames, time, status):
                 wave[len(chunk_envelope):] = 0
                 frequency = 0  # Stop the note
 
+            # Save waveform data for debugging
+        if DEBUG:
+            waveform_data.extend(wave)
+
     else:
         wave = np.zeros(frames)
 
@@ -78,7 +88,6 @@ def audio_callback(outdata, frames, time, status):
         current_envelope_position = envelope_position
 
     outdata[:] = wave.reshape(-1, 1)
-
 
 def start_audio_stream():
     """Start the audio stream."""
@@ -99,11 +108,9 @@ def play_note(note):
     global current_frequency, current_envelope, current_envelope_position
 
     with lock:
-        current_frequency = key_to_frequency[note]
+        current_frequency = KEY2FREQ[note]
         current_envelope = generate_envelope(DURATION, ATTACK, DECAY, sample_rate=SAMPLE_RATE)
         current_envelope_position = 0
-
-
 
 def stop_note():
     """Stop playing the current note."""
@@ -113,24 +120,53 @@ def stop_note():
         current_envelope = None
         current_envelope_position = 0
 
-def main():
-    print("Press keys to play notes. Press ESC to quit.")
-    start_audio_stream()  # Start audio playback
+def downsample_waveform(data, downsample_factor):
+    """Downsample waveform by the given factor."""
+    return data[::downsample_factor]  # Downsample the waveform by factor
 
+
+def plot_waveform(data, downsample_factor):
+    """Plot the waveform with zooming capability."""
+    plt.plot(data)
+    plt.savefig("test.png")
+    plt.show()
+
+def main():
+    print("Press a key")
+    start_audio_stream()  # Start audio playback
+    if DEBUG:
+        key_sequence = []
+        timestamps = []
+        tStart = datetime.now()
     # TODO : find a way to use the keyboard lib or pynput, now we need to press enter for eahc note
     while True:
         try:
             note = input("Enter note key (q/s/d/f): ").strip()
-            if note == "ESC":
+            if note == "x":
                 stop_event.set()
                 break
-            elif note in key_to_frequency:
+            elif note in KEY2FREQ:
                 play_note(note)
+                if DEBUG:
+                    key_sequence.append(KEY2FREQ[note])
+                    timestamps.append(int((datetime.now() - tStart).total_seconds() * SAMPLE_RATE))
             else:
                 print("Invalid key.")
         except KeyboardInterrupt:
             stop_event.set()
             break
+
+    if DEBUG:
+        formatted_waveform = {
+            "data" : waveform_data,
+            "key_sequence" : key_sequence,
+            "timestamps" : timestamps
+        }
+        with open("data/waveform.json", 'w') as fp:
+            json.dump(formatted_waveform, fp)
+
+        # TODO : investigate why this provoques a segfault
+        plot_waveform(np.array(waveform_data, dtype=np.float32), 1)    
 
 if __name__ == "__main__":
     main()

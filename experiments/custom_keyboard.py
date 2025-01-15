@@ -2,7 +2,7 @@ import numpy as np
 import sounddevice as sd
 import threading
 
-from simple_synthesis import generate_envelope, generate_tone_with_envelope_continuous_phase
+from synthesis import generate_envelope, generate_tone_with_envelope_continuous_phase
 from utils import SAMPLE_RATE, NOTE_FREQUENCIES, notes2freqs
 
 # Global constants

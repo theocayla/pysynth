@@ -61,6 +61,22 @@ NOTE_FREQUENCIES = {
 MIN_FREQUENCY = 16
 MAX_FREQUENCY = 7100
 
+# Mapping of the keyboard to frequencies (in Hz)
+KEY2FREQ = {
+    'q': NOTE_FREQUENCIES["C4"],
+    'z': NOTE_FREQUENCIES["C#4"],
+    's': NOTE_FREQUENCIES["D4"],
+    'e': NOTE_FREQUENCIES["D#4"],
+    'd': NOTE_FREQUENCIES["E4"],
+    'f': NOTE_FREQUENCIES["F4"],
+    't': NOTE_FREQUENCIES["F#4"],
+    'g': NOTE_FREQUENCIES["G4"],
+    'y': NOTE_FREQUENCIES["G#4"],
+    'h': NOTE_FREQUENCIES["A4"],
+    'j': NOTE_FREQUENCIES["B4"],
+    'k': NOTE_FREQUENCIES["C5"],
+}
+
 def changeOctave(frequency, octaveDiff):
     '''
     takes noteKey as input and octave delta and return new note key
