@@ -8,20 +8,9 @@ import matplotlib.pyplot as plt
 
 from synthesis import generate_tone, generate_envelope
 from utils import KEY2FREQ, SAMPLE_RATE
-
+import parameters as p
 # If True, we dump data into a csv file for further observation
 DEBUG = True
-
-# Global constants
-CHUNK_DURATION = 0.05  # Duration of each chunk in seconds
-AMPLITUDE = 0.3  # Amplitude of the sine waves
-DURATION = 0.5 # Total duration for a note
-# Envelope parameters
-ATTACK = 0.05 # in seconds
-DECAY = 0.3 # in seconds
-
-# Waveform can either be sinus, sawtooth or square
-WAVEFORM = "sinus"
 
 # Shared state
 # We need to track the signal phase to make sure we sync each note and don't hear a click when switching
@@ -59,7 +48,8 @@ def audio_callback(outdata, frames, time, status):
             duration,
             sample_rate=SAMPLE_RATE,
             initial_phase=phase,
-            waveform=WAVEFORM
+            waveform=p.WAVEFORM,
+            harmonics=p.HARMONICS
         )
 
         # Apply the corresponding portion of the envelope
@@ -98,7 +88,7 @@ def start_audio_stream():
         samplerate=SAMPLE_RATE,
         channels=1,
         callback=audio_callback,
-        blocksize=int(CHUNK_DURATION * SAMPLE_RATE),
+        blocksize=int(p.CHUNK_DURATION * SAMPLE_RATE),
     )
     stream.start()
 
@@ -109,7 +99,7 @@ def play_note(note):
 
     with lock:
         current_frequency = KEY2FREQ[note]
-        current_envelope = generate_envelope(DURATION, ATTACK, DECAY, sample_rate=SAMPLE_RATE)
+        current_envelope = generate_envelope(p.DURATION, p.ATTACK, p.DECAY, sample_rate=SAMPLE_RATE)
         current_envelope_position = 0
 
 def stop_note():
@@ -145,6 +135,20 @@ def main():
             if note == "x":
                 stop_event.set()
                 break
+            elif note == "save":
+
+                formatted_waveform = {
+                    "data" : waveform_data,
+                    "key_sequence" : key_sequence,
+                    "timestamps" : timestamps
+                }
+                # TODO : investigate why this provoques a segfault
+                # plot_waveform(np.array(waveform_data, dtype=np.float32), 1)    
+                
+                with open("data/waveform.json", 'w') as fp:
+                    json.dump(formatted_waveform, fp)
+                stop_event.set()
+                break
             elif note in KEY2FREQ:
                 play_note(note)
                 if DEBUG:
@@ -155,18 +159,6 @@ def main():
         except KeyboardInterrupt:
             stop_event.set()
             break
-
-    if DEBUG:
-        formatted_waveform = {
-            "data" : waveform_data,
-            "key_sequence" : key_sequence,
-            "timestamps" : timestamps
-        }
-        with open("data/waveform.json", 'w') as fp:
-            json.dump(formatted_waveform, fp)
-
-        # TODO : investigate why this provoques a segfault
-        plot_waveform(np.array(waveform_data, dtype=np.float32), 1)    
 
 if __name__ == "__main__":
     main()

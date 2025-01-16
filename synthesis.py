@@ -1,36 +1,10 @@
-import random
+from typing import Optional, List
 
 import matplotlib.pyplot as plt
 import numpy as np
 import sounddevice as sd
 
 from utils import NOTE_FREQUENCIES, SAMPLE_RATE
-
-def play_frequency(frequency, duration=5, volume=0.5):
-    # Generate a sine wave of the specified frequency
-    t = np.linspace(0, duration, int(SAMPLE_RATE * duration), endpoint=False)
-    signal = volume * np.sin(2 * np.pi * frequency * t)
-
-    # Play the generated signal
-    sd.play(signal, samplerate=SAMPLE_RATE)
-    sd.wait()  # Wait for the audio to finish playing
-
-def playSequence(frequencies, duration):
-    for frequency in frequencies:
-        print(frequency)
-        play_frequency(frequency, duration)
-
-def polyphony(frequencies, duration=5, volume=0.5):        
-    t = np.linspace(0, duration, int(SAMPLE_RATE * duration), endpoint=False)
-    signal = t * 0
-    for frequency in frequencies:
-        signal += volume * np.sin(2 * np.pi * frequency * t)
-
-    # Play the generated signal
-    sd.play(signal, samplerate=SAMPLE_RATE)
-    sd.wait()  # Wait for the audio to finish playing
-
-import numpy as np
 
 def generate_envelope(duration, attack, decay, sample_rate=44100):
     """
@@ -73,16 +47,19 @@ def generate_envelope(duration, attack, decay, sample_rate=44100):
     
     return envelope
 
-
-def generate_tone_with_envelope(frequency, duration, envelope, SAMPLE_RATE=44100):
-    t = np.linspace(0, duration, int(SAMPLE_RATE * duration), endpoint=False)
-    signal = envelope * np.sin(2 * np.pi * frequency * t)
-    return signal
-
-def generate_tone(frequency, duration, envelope=None, sample_rate=SAMPLE_RATE, initial_phase=0, waveform="sinus"):
+def generate_tone(
+    frequency: float,  # Fundamental frequency in Hz
+    duration: float,  # Sound duration in seconds
+    envelope: Optional[List[float]] = None,  # Envelope array
+    sample_rate: int = 44100,
+    initial_phase: float = 0.0,  # Initial phase in rad
+    waveform: str = "sinus",  # Wave type ("sinus", "square", "triangle")
+    harmonics: List[float] = [1.0]  # Harmonics coefficients
+) -> List[float]:  # La fonction retourne une 
     '''
     Generates tone, applies envelope if it exists, and tracks phase for sound continuity puropses.
     Three waveforms are available : sinus, sawtooth or square
+    TODO : adapt function to take a list of frequency as input
     '''
     t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
     omega = 2 * np.pi * frequency
@@ -100,8 +77,24 @@ def generate_tone(frequency, duration, envelope=None, sample_rate=SAMPLE_RATE, i
     # Applies envelop
     if envelope is not None:
         signal *= envelope
+
+    # Adding harmonics
+    # TODO : this needs debugging
+    for i, coeff in enumerate(harmonics[1:], start=2):  # Commence à la 2e harmonique
+        signal += coeff * np.sin(omega * t * i + initial_phase)
+    
+    # Computing final phase (useless for real time usage)
     final_phase = (omega * duration + initial_phase) % (2 * np.pi)
+
+    # Normalization
+    signal = signal / np.max(np.abs(signal))
+
     return signal, final_phase
+
+def generate_tone_with_envelope(frequency, duration, envelope, SAMPLE_RATE=44100):
+    t = np.linspace(0, duration, int(SAMPLE_RATE * duration), endpoint=False)
+    signal = envelope * np.sin(2 * np.pi * frequency * t)
+    return signal
 
 def play_tone_with_envelope(frequency, duration, envelope):
     signal = generate_tone_with_envelope(frequency, duration, envelope, SAMPLE_RATE)
@@ -141,29 +134,6 @@ def play_chorus_effect(frequencies, duration, depth=0.02, rate=1.5):
     sd.play(modulated_signal, samplerate=SAMPLE_RATE, blocking=True)
 
 if __name__ == "__main__":
-
-    frequencyRange = [100, 1000]
-
-    sequenceLength = 30
-    sequence = [NOTE_FREQUENCIES[random.choice(list(NOTE_FREQUENCIES.keys()))]for _ in range(sequenceLength)]
-    # playSequence(sequence, duration=0.2)
-
-    chord1 = [
-        NOTE_FREQUENCIES["C4"],
-        NOTE_FREQUENCIES["E4"],
-        NOTE_FREQUENCIES["G4"],
-        NOTE_FREQUENCIES["B4"],
-        NOTE_FREQUENCIES["D5"],
-    ]
-    chord2 = [
-        NOTE_FREQUENCIES["D4"],
-        NOTE_FREQUENCIES["F4"],
-        NOTE_FREQUENCIES["A4"],
-        NOTE_FREQUENCIES["C5"],
-        NOTE_FREQUENCIES["E5"],
-    ]
-    # polyphony(chord1, duration=5, volume=0.5)
-
 
     # Example usage:
     duration = 4.0

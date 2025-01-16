@@ -77,6 +77,7 @@ KEY2FREQ = {
     'k': NOTE_FREQUENCIES["C5"],
 }
 
+
 def changeOctave(frequency, octaveDiff):
     '''
     takes noteKey as input and octave delta and return new note key
