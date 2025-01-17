@@ -4,9 +4,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sounddevice as sd
 
-from utils import NOTE_FREQUENCIES, SAMPLE_RATE
+from utils import SAMPLE_RATE
 
-def generate_envelope(duration, attack, decay, sample_rate=44100):
+def generate_envelope(
+        duration : float,
+        attack : float,
+        decay : float,
+        sample_rate=44100
+) -> List[float]:
     """
     Generate a simple envelop    
     Parameters:
@@ -55,7 +60,7 @@ def generate_tone(
     initial_phase: float = 0.0,  # Initial phase in rad
     waveform: str = "sinus",  # Wave type ("sinus", "square", "triangle")
     harmonics: List[float] = [1.0]  # Harmonics coefficients
-) -> List[float]:  # La fonction retourne une 
+) -> List[float]:
     '''
     Generates tone, applies envelope if it exists, and tracks phase for sound continuity puropses.
     Three waveforms are available : sinus, sawtooth or square
@@ -79,7 +84,7 @@ def generate_tone(
         signal *= envelope
 
     # Adding harmonics
-    # TODO : this needs debugging
+    # TODO : this needs debugging, continuity issues
     for i, coeff in enumerate(harmonics[1:], start=2):  # Commence à la 2e harmonique
         signal += coeff * np.sin(omega * t * i + initial_phase)
     
@@ -87,7 +92,7 @@ def generate_tone(
     final_phase = (omega * duration + initial_phase) % (2 * np.pi)
 
     # Normalization
-    signal = signal / np.max(np.abs(signal))
+    # signal = signal / np.max(np.abs(signal))
 
     return signal, final_phase
 
