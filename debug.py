@@ -1,25 +1,41 @@
+import argparse
 import json
+import logging
+import os
+
 import matplotlib.pyplot as plt
 import numpy as np
-import argparse
 
 from utils import SAMPLE_RATE
 
-def plot_waveform(filepath):
-    with open(filepath, 'r') as fp:
-        x = json.load(fp)["data"]
+def plot_waveform(data, save=False):
+    if isinstance(data, str):
+        if os.path.isfile(data):
+            with open(data, 'r') as fp:
+                x = json.load(fp)["data"]
+        else:
+            logging.info(f"No debug file found : {data}")
+    else:
+        x = data
     plt.plot(x)
-    plt.savefig("test.png")
+    if save:
+        plt.savefig("waveform.png")
     plt.show()
 
-def plot_spectrum(filepath):
+def plot_spectrum(data, save=False):
     '''
     Loads the audio signal and plot its spectrum
     '''
-    with open(filepath, 'r') as fp:
-        x = json.load(fp)["data"]
+    if isinstance(data, str):
+        if os.path.isfile(data):
+            with open(data, 'r') as fp:
+                x = json.load(fp)["data"]
+        else:
+            logging.info(f"No debug file found : {data}")
+    else:
+        x = data
     fft_values = np.fft.fft(x)
-    frequencies = np.ft.fftfreq(len(x), d=1/SAMPLE_RATE)
+    frequencies = np.fft.fftfreq(len(x), d=1/SAMPLE_RATE)
     positive_freq = frequencies[:len(x)//2]
     spectrum = np.abs(fft_values)[:len(x)//2]
 
@@ -29,6 +45,8 @@ def plot_spectrum(filepath):
     plt.xlabel("Freq")
     plt.ylabel("Amplitude")
     plt.grid()
+    if save:
+        plt.savefig("spectrum.png")
     plt.show()
 
 default_path = "data/waveform.json"

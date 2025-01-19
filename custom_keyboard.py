@@ -1,14 +1,19 @@
-import numpy as np
-import sounddevice as sd
-import threading
+import argparse
 import json
+import threading
+
 from datetime import datetime 
 
 import matplotlib.pyplot as plt
+import numpy as np
+import sounddevice as sd
 
+import parameters as p
+
+from debug import plot_waveform, plot_spectrum, default_path
 from synthesis import generate_tone, generate_envelope
 from utils import KEY2FREQ, SAMPLE_RATE
-import parameters as p
+
 # If True, we dump data into a csv file for further observation
 DEBUG = True
 
@@ -114,13 +119,6 @@ def downsample_waveform(data, downsample_factor):
     """Downsample waveform by the given factor."""
     return data[::downsample_factor]  # Downsample the waveform by factor
 
-
-def plot_waveform(data, downsample_factor):
-    """Plot the waveform with zooming capability."""
-    plt.plot(data)
-    plt.savefig("test.png")
-    plt.show()
-
 def main():
     print("Press a key")
     start_audio_stream()  # Start audio playback
@@ -162,3 +160,14 @@ def main():
 
 if __name__ == "__main__":
     main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Activates debug plots"
+    )
+    args = parser.parse_args()
+    # TODO : investigate why this provoques a segfault
+    if args.debug:
+        plot_waveform(default_path)
+        plot_spectrum(default_path)
