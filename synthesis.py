@@ -1,10 +1,6 @@
 from typing import Optional, List
 
-import matplotlib.pyplot as plt
 import numpy as np
-import sounddevice as sd
-
-from utils import SAMPLE_RATE
 
 def generate_envelope(
         duration : float,
@@ -57,7 +53,7 @@ def generate_tone(
     duration: float,  # Sound duration in seconds
     envelope: Optional[List[float]] = None,  # Envelope array
     sample_rate: int = 44100,
-    initial_phase: float = 0.0,  # Initial phase in rad
+    initial_phases: Optional[List[float]] = None, # Initial phase of each harmonic
     waveform: str = "sinus",  # Wave type ("sinus", "square", "triangle")
     harmonics: List[float] = [1.0]  # Harmonics coefficients
 ) -> List[float]:
@@ -69,96 +65,89 @@ def generate_tone(
     t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
     omega = 2 * np.pi * frequency
 
+    # Initialize signal and final phases
+    signal = np.zeros_like(t)
+    final_phases = []
+
+    if initial_phases is None:
+        initial_phases = [0.0] * len(harmonics)
+
     # Define waveform 
     if waveform == 'sinus':
-        signal = np.sin(omega * t + initial_phase)
+        pass
     elif waveform == 'sawtooth':
-        signal = 2 * (t * frequency - np.floor(0.5 + t * frequency))
+        signal += 2 * (t * frequency - np.floor(0.5 + t * frequency))
     elif waveform == 'square':
-        signal = np.sign(np.sin(omega * t + initial_phase))
+        signal += np.sign(np.sin(omega * t))
     else:
         raise ValueError("Unsupported wave type. Choose among 'sinus', 'sawtooth', or 'square'.")
 
-    # Applies envelop
+    # Adding harmonics
+    # TODO : a slight click is hearable when changing notes, phase need to be properly set
+    if waveform == 'sinus':
+        # Generate fundamental and harmonics
+        for i, (coeff, harmonic_phase) in enumerate(zip(harmonics, initial_phases), start=1):
+            # Each harmonic needs to be initialized with its own initial phase
+            harmonic_omega = omega * i  # Frequency for harmonic
+            harmonic_signal = coeff * np.sin(harmonic_omega * t + harmonic_phase)
+            signal += harmonic_signal
+            # We compute the final phase for each harmonic to initialize the next chunk
+            harmonic_final_phase = (harmonic_omega * duration + harmonic_phase) % (2 * np.pi)
+            final_phases.append(harmonic_final_phase)
+
     if envelope is not None:
+        # TODO : need to select the right slice of the enveloppe to be applied for a given chunk
         signal *= envelope
 
-    # Adding harmonics
-    # TODO : this needs debugging, continuity issues
-    for i, coeff in enumerate(harmonics[1:], start=2):  # Commence à la 2e harmonique
-        signal += coeff * np.sin(omega * t * i + initial_phase)
-    
-    # Computing final phase (useless for real time usage)
-    final_phase = (omega * duration + initial_phase) % (2 * np.pi)
-
     # Normalization
-    # signal = signal / np.max(np.abs(signal))
+    signal = signal / np.max(np.abs(signal))
 
-    return signal, final_phase
+    return signal, final_phases
 
-def generate_tone_with_envelope(frequency, duration, envelope, SAMPLE_RATE=44100):
+def generate_tone_with_envelope(
+    frequency: float,
+    duration: float,
+    envelope: np.ndarray,
+    SAMPLE_RATE: int = 44100
+) -> np.ndarray:
+    """
+    Generate a sinusoidal tone modulated by an envelope.
+
+    Args:
+        frequency (float): Frequency of the tone in Hz.
+        duration (float): Duration of the tone in seconds.
+        envelope (np.ndarray): Envelope array to shape the amplitude of the tone.
+        SAMPLE_RATE (int, optional): Sampling rate in Hz. Defaults to 44100.
+
+    Returns:
+        np.ndarray: The generated audio signal as a NumPy array.
+    """
     t = np.linspace(0, duration, int(SAMPLE_RATE * duration), endpoint=False)
     signal = envelope * np.sin(2 * np.pi * frequency * t)
     return signal
 
-def play_tone_with_envelope(frequency, duration, envelope):
-    signal = generate_tone_with_envelope(frequency, duration, envelope, SAMPLE_RATE)
-    sd.play(signal, samplerate=SAMPLE_RATE)
-    sd.wait()
 
-def play_chord_with_envelope(frequencies, duration, envelope):
-    t = np.linspace(0, duration, int(SAMPLE_RATE * duration), endpoint=False)
-    signal = signal = t * 0
-    for frequency in frequencies:
-        signal += generate_tone_with_envelope(frequency, duration, envelope, SAMPLE_RATE)
-    sd.play(signal, samplerate=SAMPLE_RATE)
-    sd.wait()
+def apply_chorus_effect(
+    signal: np.ndarray,
+    SAMPLE_RATE: int = 44100,
+    depth: float = 0.02,
+    rate: float = 1.5
+) -> np.ndarray:
+    """
+    Apply a chorus effect to an audio signal by introducing pitch modulation.
 
-def apply_chorus_effect(signal, SAMPLE_RATE=44100, depth=0.02, rate=1.5):
-    # Generate a modulation signal for pitch variation
+    Args:
+        signal (np.ndarray): Input audio signal as a NumPy array.
+        SAMPLE_RATE (int, optional): Sampling rate in Hz. Defaults to 44100.
+        depth (float, optional): Depth of the modulation in seconds. Defaults to 0.02.
+        rate (float, optional): Rate of modulation in Hz. Defaults to 1.5.
+
+    Returns:
+        np.ndarray: The audio signal with the chorus effect applied.
+    """
     t = np.arange(len(signal)) / SAMPLE_RATE
     modulation_signal = depth * np.sin(2 * np.pi * rate * t)
 
-    # Apply chorus effect by varying pitch
+    # Apply chorus effect by interpolating the modulated signal
     modulated_signal = np.interp(t + modulation_signal, t, signal)
-
     return modulated_signal
-
-def play_chorus_effect(frequencies, duration, depth=0.02, rate=1.5):
-    SAMPLE_RATE = 44100
-    t = np.linspace(0, duration, int(SAMPLE_RATE * duration), endpoint=False)
-    signal = t * 0
-    for frequency in frequencies:
-        signal += np.sin(2 * np.pi * frequency * t)
-
-    # Apply chorus effect
-    modulated_signal = apply_chorus_effect(signal, SAMPLE_RATE, depth, rate)
-
-    # Play the original and modulated signals
-    # sd.play(signal, samplerate=SAMPLE_RATE, blocking=True)
-    sd.play(modulated_signal, samplerate=SAMPLE_RATE, blocking=True)
-
-if __name__ == "__main__":
-
-    # Example usage:
-    duration = 4.0
-    frequency = 440.0  # Hz
-    attack = 0.4    # 0.5 seconde
-    decay = 2.5     # 1 seconde
-    # Generate envelope
-    envelope = generate_envelope(duration, attack, decay, SAMPLE_RATE)
-
-    # Visualiser l'enveloppe
-    time = np.linspace(0, duration, len(envelope))
-    plt.plot(time, envelope)
-    plt.title("Enveloppe sonore")
-    plt.xlabel("Temps (s)")
-    plt.ylabel("Amplitude")
-    plt.grid()
-    plt.show()
-
-    # Play tone with the generated envelope
-    # play_tone_with_envelope(frequency, duration, envelope)
-    # play_chord_with_envelope(chord1, duration, envelope)
-    # play_chord_with_envelope(chord2, duration, envelope)
-    # play_chorus_effect([frequency], duration, depth=0.002, rate=4)

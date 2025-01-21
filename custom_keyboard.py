@@ -11,11 +11,6 @@ from debug import plot_waveform, plot_spectrum, default_path
 from synthesis import generate_tone, generate_envelope
 from utils import KEY2FREQ, SAMPLE_RATE
 
-# Shared state
-# We need to track the signal phase to make sure we sync each note and don't hear a click when switching
-current_phase = 0  # Phase of the current note
-current_frequency = 0  # Frequency of the current note
-
 # Envelop is generated once for the whole note, then each chunk is applied during audio_callback
 current_envelope = None  # Envelope of the current note
 current_envelope_position = 0  # Position in the envelope
@@ -28,7 +23,7 @@ waveform_data = []  # Stores the waveform if DEBUG_MODE is active
 
 def audio_callback(outdata, frames, time, status):
     """Audio callback to generate and stream the sound in real-time."""
-    global current_phase, current_frequency, current_envelope, current_envelope_position, waveform_data
+    global current_phases, current_frequency, current_envelope, current_envelope_position, waveform_data
 
     if stop_event.is_set():
         outdata.fill(0)
@@ -36,17 +31,18 @@ def audio_callback(outdata, frames, time, status):
 
     with lock:
         frequency = current_frequency
-        phase = current_phase
+        phases = current_phases
         envelope = current_envelope
         envelope_position = current_envelope_position
 
     duration = frames / SAMPLE_RATE
     if frequency > 0:
-        wave, phase = generate_tone(
+        print(f"avant gen : {phases}")
+        wave, phases = generate_tone(
             frequency,
             duration,
             sample_rate=SAMPLE_RATE,
-            initial_phase=phase,
+            initial_phases=phases,
             waveform=p.WAVEFORM,
             harmonics=p.HARMONICS
         )
@@ -72,7 +68,7 @@ def audio_callback(outdata, frames, time, status):
         wave = np.zeros(frames)
 
     with lock:
-        current_phase = phase  # Update global phase to keep track of where we are
+        current_phases = phases  # Update global phase to keep track of where we are
         current_frequency = frequency
         current_envelope_position = envelope_position
 
@@ -80,8 +76,8 @@ def audio_callback(outdata, frames, time, status):
 
 def start_audio_stream():
     """Start the audio stream."""
-    global current_phase, current_frequency
-    current_phase = 0  # Reset phase at the start
+    global current_phases, current_frequency
+    current_phases = None  # Reset phase at the start
     current_frequency = 0  # No note initially
     stream = sd.OutputStream(
         samplerate=SAMPLE_RATE,

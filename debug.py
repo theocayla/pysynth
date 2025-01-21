@@ -2,13 +2,14 @@ import argparse
 import json
 import logging
 import os
-
 from typing import Optional, List, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
 
+import parameters as p
 from utils import SAMPLE_RATE
+
 
 def plot_waveform(
     data: Union[str, np.ndarray], 
@@ -38,10 +39,9 @@ def plot_waveform(
         raise TypeError("The 'data' argument must be a string (file path) or a NumPy array.")
     
     if slice is not None:
-        print(type(signal))
-        print(signal.shape[0])
-        if not (isinstance(slice, list) and len(slice) == 2 and (slice[0] < 0 or slice[1] > len(signal))):
+        if not (isinstance(slice, list) and len(slice) == 2 and not (slice[0] < 0 or slice[1] > len(signal))):
             raise ValueError(f"Error ploting the signal : slice should be a list of two integer indices within signal boundaries (slice = {slice}).")
+        signal = signal[int(slice[0]):int(slice[1])]
     plt.plot(signal)
     if save:
         plt.savefig("waveform.png")
@@ -106,5 +106,5 @@ if __name__ == "__main__":
         help="Specify the path of the json fil containing the audio sample"
     )
     args = parser.parse_args()
-    plot_waveform(args.path)
+    plot_waveform(args.path, slice=[0, 2 * p.CHUNK_DURATION * SAMPLE_RATE])
     plot_spectrum(args.path)
