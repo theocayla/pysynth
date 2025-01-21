@@ -1,21 +1,15 @@
 import argparse
 import json
 import threading
-
 from datetime import datetime 
 
-import matplotlib.pyplot as plt
 import numpy as np
 import sounddevice as sd
 
 import parameters as p
-
 from debug import plot_waveform, plot_spectrum, default_path
 from synthesis import generate_tone, generate_envelope
 from utils import KEY2FREQ, SAMPLE_RATE
-
-# If True, we dump data into a csv file for further observation
-DEBUG = True
 
 # Shared state
 # We need to track the signal phase to make sure we sync each note and don't hear a click when switching
@@ -133,7 +127,7 @@ def main():
             if note == "x":
                 stop_event.set()
                 break
-            elif note == "save":
+            elif note == "save" and DEBUG:
 
                 formatted_waveform = {
                     "data" : waveform_data,
@@ -159,7 +153,6 @@ def main():
             break
 
 if __name__ == "__main__":
-    main()
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--debug",
@@ -167,7 +160,12 @@ if __name__ == "__main__":
         help="Activates debug plots"
     )
     args = parser.parse_args()
-    # TODO : investigate why this provoques a segfault
-    if args.debug:
-        plot_waveform(default_path)
-        plot_spectrum(default_path)
+    DEBUG = args.debug
+
+    main()
+
+    # Check why this creates a segfault
+    # if args.debug:
+    #     # If True, we dump data into a json file for further observation
+    #     plot_waveform(default_path, slice=[0, 2 * p.CHUNK_DURATION * SAMPLE_RATE])
+    #     plot_spectrum(default_path)
